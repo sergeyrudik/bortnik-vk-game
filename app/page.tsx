@@ -45,7 +45,9 @@ const REWARD_MOVES = 5;
 const REWARD_COOLDOWN_MS = 3 * 60 * 1000;
 const REWARD_DAILY_LIMIT = 8;
 const INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000;
-const VK_APP_URL = "https://vk.com/app";
+const PRODUCTION_URL = "https://sergeyrudik-bortnik-vk-game-c295.twc1.net/";
+/** Replace with https://vk.com/appXXXX after the VK Mini App is created. */
+const VK_APP_URL = PRODUCTION_URL;
 
 const DAILY_QUESTS: Array<{
   id: string;

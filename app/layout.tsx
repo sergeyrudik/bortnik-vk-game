@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://example.com"),
+  metadataBase: new URL("https://sergeyrudik-bortnik-vk-game-c295.twc1.net"),
   title: "Бортник — золотые соты",
   description: "Собирай нектар в сотах, вари мёд и отгоняй ос, пока улей не полон.",
   alternates: {

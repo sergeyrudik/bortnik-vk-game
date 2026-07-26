@@ -4,10 +4,10 @@
 банку мёда, отгоняет ос и развивает пасеку.
 
 - VK Mini App: _создайте приложение в кабинете VK и подставьте ID_
-- production: _URL Timeweb после деплоя_
+- production: [sergeyrudik-bortnik-vk-game-c295.twc1.net](https://sergeyrudik-bortnik-vk-game-c295.twc1.net/)
 - репозиторий: [sergeyrudik/bortnik-vk-game](https://github.com/sergeyrudik/bortnik-vk-game)
-- политика конфиденциальности: `/privacy/`
-- пользовательское соглашение: `/terms/`
+- политика конфиденциальности: [production/privacy/](https://sergeyrudik-bortnik-vk-game-c295.twc1.net/privacy/)
+- пользовательское соглашение: [production/terms/](https://sergeyrudik-bortnik-vk-game-c295.twc1.net/terms/)
 
 ## Стек
 
@@ -87,19 +87,23 @@ tests/              автотесты
 добавлять в клиентский код, `.env`, историю Git или настройки сборки
 статического приложения. Для текущей версии они не нужны.
 
-После успешного деплоя в настройках VK Mini Apps укажите один и тот же HTTPS URL
-для Web, мобильной версии сайта и мобильного приложения (подставьте URL из
-Timeweb), затем обновите `metadataBase` в `app/layout.tsx`, `VK_APP_URL` в
-`app/page.tsx` и ссылки в `moderation/`.
+Production URL:
+
+```text
+https://sergeyrudik-bortnik-vk-game-c295.twc1.net/
+```
+
+В настройках VK Mini Apps укажите этот же HTTPS URL для Web, мобильной версии
+сайта и мобильного приложения. Сначала проверьте в режиме разработки и тестовой
+группе; перед модерацией отключите режим разработки.
 
 ## VK
 
 После создания мини-приложения:
 
-1. Укажите Web/Mobile URL на production Timeweb.
-2. Подставьте `VK_APP_URL` в `app/page.tsx` и ссылки в legal/moderation.
-3. Обновите `metadataBase` в `app/layout.tsx`.
-4. Загрузите ассеты из `moderation/assets` (сгенерировать: `pnpm run moderation:assets`).
+1. Укажите Web/Mobile URL: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/`
+2. Подставьте `https://vk.com/appXXXX` в `VK_APP_URL` в `app/page.tsx`.
+3. Загрузите ассеты из `moderation/assets` (сгенерировать: `pnpm run moderation:assets`).
 
 ## Геймплей
 

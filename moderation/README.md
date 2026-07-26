@@ -56,11 +56,11 @@ pnpm run moderation:validate
 
 ## Размещение и документы
 
-- Web URL: `_PRODUCTION_URL_`
-- Мобильное приложение URL: `_PRODUCTION_URL_`
-- Мобильная версия сайта URL: `_PRODUCTION_URL_`
-- Политика конфиденциальности: `_PRODUCTION_URL_/privacy/`
-- Пользовательское соглашение: `_PRODUCTION_URL_/terms/`
+- Web URL: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/`
+- Мобильное приложение URL: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/`
+- Мобильная версия сайта URL: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/`
+- Политика конфиденциальности: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/privacy/`
+- Пользовательское соглашение: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/terms/`
 
 ## Комментарий модератору
 

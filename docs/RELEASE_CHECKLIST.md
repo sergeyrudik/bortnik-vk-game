@@ -4,7 +4,7 @@
 
 VK App ID: **_подставить после создания_**
 
-Production: **_URL Timeweb_**
+Production: **https://sergeyrudik-bortnik-vk-game-c295.twc1.net/**
 
 ## 1. Код и сборка — обязательно
 
