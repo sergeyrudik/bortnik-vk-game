@@ -69,7 +69,7 @@ const shotTitles = {
 
 for (const [name, copy] of Object.entries(shotTitles)) {
   const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <svg xmlns="http://www.w3.org/2000/svg" width="600" height="1200" viewBox="0 0 600 1200">
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#9ec9e0"/>
@@ -81,29 +81,26 @@ for (const [name, copy] of Object.entries(shotTitles)) {
         <stop offset="1" stop-color="#e6a512"/>
       </linearGradient>
     </defs>
-    <rect width="1200" height="600" fill="url(#bg)"/>
-    <path d="M90 70h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".35"/>
-    <path d="M1070 70h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".35"/>
-    <path d="M90 460h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".28"/>
-    <path d="M1070 460h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".28"/>
-    <rect x="90" y="70" width="1020" height="460" rx="28" fill="#fff8e7" stroke="#8a6a28" stroke-width="6"/>
-    <rect x="120" y="100" width="180" height="180" rx="90" fill="url(#honey)" stroke="#fff8e7" stroke-width="4"/>
-    <text x="210" y="210" text-anchor="middle" fill="#2f5d3a" font-family="Georgia, serif" font-size="72" font-weight="700">Б</text>
-    <text x="340" y="170" fill="#1c2e24" font-family="Georgia, serif" font-size="64" font-weight="700">${copy.title}</text>
-    <text x="340" y="230" fill="#2f5d3a" font-family="Trebuchet MS, sans-serif" font-size="30" font-weight="700">${copy.subtitle}</text>
-    <text x="340" y="290" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="22">Бортник — золотые соты · VK Mini App</text>
-    <rect x="120" y="360" width="960" height="120" rx="20" fill="#eef6e4" stroke="#a7c48a" stroke-width="3"/>
-    <circle cx="180" cy="420" r="28" fill="#f4e27a"/>
-    <circle cx="260" cy="420" r="28" fill="#8b5a2b"/>
-    <circle cx="340" cy="420" r="28" fill="#4caf6a"/>
-    <circle cx="420" cy="420" r="28" fill="#f0a500"/>
-    <circle cx="500" cy="420" r="28" fill="#d45d8c"/>
-    <text x="560" y="412" fill="#1c2e24" font-family="Trebuchet MS, sans-serif" font-size="24" font-weight="700">Нектар · мёд · осы · улучшения пасеки</text>
-    <text x="560" y="448" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="18">1200×600 · экран «${copy.title}»</text>
+    <rect width="600" height="1200" fill="url(#bg)"/>
+    <path d="M70 80h36l18 30-18 30h-36l-18-30z" fill="#e6a512" opacity=".35"/>
+    <path d="M510 80h36l18 30-18 30h-36l-18-30z" fill="#e6a512" opacity=".35"/>
+    <rect x="40" y="220" width="520" height="760" rx="32" fill="#fff8e7" stroke="#8a6a28" stroke-width="6"/>
+    <rect x="210" y="280" width="180" height="180" rx="90" fill="url(#honey)" stroke="#fff8e7" stroke-width="4"/>
+    <text x="300" y="395" text-anchor="middle" fill="#2f5d3a" font-family="Georgia, serif" font-size="72" font-weight="700">Б</text>
+    <text x="300" y="520" text-anchor="middle" fill="#1c2e24" font-family="Georgia, serif" font-size="52" font-weight="700">${copy.title}</text>
+    <text x="300" y="575" text-anchor="middle" fill="#2f5d3a" font-family="Trebuchet MS, sans-serif" font-size="22" font-weight="700">${copy.subtitle}</text>
+    <text x="300" y="625" text-anchor="middle" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="18">Бортник — золотые соты</text>
+    <circle cx="140" cy="740" r="28" fill="#f4e27a"/>
+    <circle cx="220" cy="740" r="28" fill="#8b5a2b"/>
+    <circle cx="300" cy="740" r="28" fill="#4caf6a"/>
+    <circle cx="380" cy="740" r="28" fill="#f0a500"/>
+    <circle cx="460" cy="740" r="28" fill="#d45d8c"/>
+    <text x="300" y="830" text-anchor="middle" fill="#1c2e24" font-family="Trebuchet MS, sans-serif" font-size="22" font-weight="700">Нектар · мёд · осы</text>
+    <text x="300" y="870" text-anchor="middle" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="16">VK Mini App · 600×1200 · «${copy.title}»</text>
   </svg>`;
   await sharp(Buffer.from(svg))
     .jpeg({ quality: 92, mozjpeg: true })
-    .toFile(resolve(output, `screenshot-${name}-1200x600.jpg`));
+    .toFile(resolve(output, `screenshot-${name}-600x1200.jpg`));
 }
 
 
