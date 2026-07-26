@@ -5,6 +5,7 @@
 
 - VK Mini App: _создайте приложение в кабинете VK и подставьте ID_
 - production: _URL Timeweb после деплоя_
+- репозиторий: [sergeyrudik/bortnik-vk-game](https://github.com/sergeyrudik/bortnik-vk-game)
 - политика конфиденциальности: `/privacy/`
 - пользовательское соглашение: `/terms/`
 
