@@ -253,7 +253,17 @@ button:focus-visible, a:focus-visible {
 .game-frame {
   width: min(100%, 520px);
   margin: 0 auto;
-  padding: 12px 12px 88px;
+  padding: 12px 12px calc(88px + env(safe-area-inset-bottom));
+}
+
+.pause-banner {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(28, 46, 36, 0.88);
+  color: var(--paper);
+  text-align: center;
+  font-weight: 800;
 }
 
 .topbar {
@@ -369,7 +379,7 @@ button:focus-visible, a:focus-visible {
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 4px;
   padding: 8px;
   border-radius: 18px;
@@ -378,7 +388,7 @@ button:focus-visible, a:focus-visible {
     #6d8f4e;
   border: 3px solid #4a6f38;
   user-select: none;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .board-grid.busy {
@@ -417,8 +427,32 @@ button:focus-visible, a:focus-visible {
   animation: honey-flash 0.35s ease;
 }
 
+.cell.hinted .cell-inner {
+  animation: hint-pulse 0.6s ease-in-out infinite alternate;
+}
+
 .cell.wasp-shake .cell-inner {
   animation: wasp-shake 0.35s ease;
+}
+
+@keyframes hint-pulse {
+  from { filter: brightness(1); transform: scale(1); }
+  to { filter: brightness(1.25); transform: scale(1.12); }
+}
+
+@media (max-width: 360px) {
+  .game-frame {
+    padding-inline: 4px;
+  }
+
+  .panel {
+    padding: 5px;
+  }
+
+  .board-grid {
+    gap: 3px;
+    padding: 4px;
+  }
 }
 
 .cell-badge {
@@ -472,6 +506,8 @@ button:focus-visible, a:focus-visible {
 
 .overlay-card {
   width: min(100%, 360px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   background: var(--paper);
   border: 3px solid #8a6a28;
   border-radius: 22px;
@@ -512,7 +548,7 @@ button:focus-visible, a:focus-visible {
 }
 
 .btn.danger {
-  background: linear-gradient(180deg, #f0a090, #c24b2a);
+  background: linear-gradient(180deg, #cf654c, #9f321c);
   color: #fff8e7;
   border-color: #8a2f1c;
 }
@@ -520,7 +556,7 @@ button:focus-visible, a:focus-visible {
 .tabs {
   position: fixed;
   left: 50%;
-  bottom: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(calc(100% - 16px), 500px);
   display: grid;
@@ -532,6 +568,17 @@ button:focus-visible, a:focus-visible {
   border: 2px solid #8a6a28;
   z-index: 30;
   box-shadow: 0 10px 30px rgba(28, 46, 36, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 .tab {

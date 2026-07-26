@@ -5,10 +5,16 @@ import test from "node:test";
 
 const outputRoot = new URL("../out/", import.meta.url);
 const outputExists = existsSync(outputRoot);
+const requireOutput = process.env.REQUIRE_PRODUCTION_EXPORT === "1";
 
 test(
   "production export contains the playable Russian game shell",
-  { skip: outputExists ? false : "run `pnpm build` before the production smoke test" },
+  {
+    skip:
+      outputExists || requireOutput
+        ? false
+        : "run `pnpm build` before the production smoke test",
+  },
   async () => {
     const html = await readFile(new URL("index.html", outputRoot), "utf8");
 
@@ -36,7 +42,12 @@ test(
 
 test(
   "production export includes local JavaScript and stylesheet assets",
-  { skip: outputExists ? false : "run `pnpm build` before the production smoke test" },
+  {
+    skip:
+      outputExists || requireOutput
+        ? false
+        : "run `pnpm build` before the production smoke test",
+  },
   async () => {
     const [html, staticEntries] = await Promise.all([
       readFile(new URL("index.html", outputRoot), "utf8"),

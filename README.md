@@ -3,7 +3,7 @@
 Казуальный match-3 для VK Mini Apps. Игрок меняет соты с нектаром, наполняет
 банку мёда, отгоняет ос и развивает пасеку.
 
-- VK Mini App: _создайте приложение в кабинете VK и подставьте ID_
+- VK Mini App: [vk.ru/app54694415](https://vk.ru/app54694415)
 - production: [sergeyrudik-bortnik-vk-game-c295.twc1.net](https://sergeyrudik-bortnik-vk-game-c295.twc1.net/)
 - репозиторий: [sergeyrudik/bortnik-vk-game](https://github.com/sergeyrudik/bortnik-vk-game)
 - политика конфиденциальности: [production/privacy/](https://sergeyrudik-bortnik-vk-game-c295.twc1.net/privacy/)
@@ -99,15 +99,16 @@ https://sergeyrudik-bortnik-vk-game-c295.twc1.net/
 
 ## VK
 
-После создания мини-приложения:
+Для зарегистрированного мини-приложения:
 
 1. Укажите Web/Mobile URL: `https://sergeyrudik-bortnik-vk-game-c295.twc1.net/`
-2. Подставьте `https://vk.com/appXXXX` в `VK_APP_URL` в `app/page.tsx`.
+2. Адрес `https://vk.ru/app54694415` уже задан как production fallback. Для
+   локального переопределения скопируйте `.env.example` в `.env.local`.
 3. Загрузите ассеты из `moderation/assets` (сгенерировать: `pnpm run moderation:assets`).
 
 ## Геймплей
 
-- поле 8×8, обмен соседних сот;
+- поле 6×6, обмен соседних сот;
 - цель — наполнить банку мёда (и иногда собрать тип нектара / снять воск);
 - спецфишки: пчела (линия), матка (3×3), горшок (весь цвет);
 - блокеры: восковые печати и осы;
