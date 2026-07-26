@@ -61,30 +61,51 @@ await sharp(Buffer.from(ogSvg))
   .toFile(resolve(output, "big-snippet-1120x630.png"));
 
 const shotTitles = {
-  start: "Старт · Бортник",
-  campaign: "Улей · лужайка",
-  camp: "Пасека · улучшения",
-  quests: "Задания дня",
+  start: { title: "Бортник", subtitle: "Золотые соты — наполни улей!" },
+  campaign: { title: "Улей", subtitle: "Соты, банка мёда и ходы" },
+  camp: { title: "Пасека", subtitle: "Улучшения сот, медогонки и дымаря" },
+  quests: { title: "Задания", subtitle: "Ежедневный сбор нектара" },
 };
 
-for (const [name, title] of Object.entries(shotTitles)) {
+for (const [name, copy] of Object.entries(shotTitles)) {
   const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#9ec9e0"/>
+        <stop offset=".45" stop-color="#8fbf6a"/>
         <stop offset="1" stop-color="#2f5d3a"/>
       </linearGradient>
+      <linearGradient id="honey" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffe9a8"/>
+        <stop offset="1" stop-color="#e6a512"/>
+      </linearGradient>
     </defs>
-    <rect width="1280" height="720" fill="url(#bg)"/>
-    <rect x="80" y="80" width="1120" height="560" rx="36" fill="#fff8e7" stroke="#8a6a28" stroke-width="8"/>
-    <text x="640" y="300" text-anchor="middle" fill="#1c2e24" font-family="Georgia, serif" font-size="72" font-weight="700">${title}</text>
-    <text x="640" y="390" text-anchor="middle" fill="#2f5d3a" font-family="Trebuchet MS, sans-serif" font-size="36">Бортник — золотые соты</text>
+    <rect width="1200" height="600" fill="url(#bg)"/>
+    <path d="M90 70h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".35"/>
+    <path d="M1070 70h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".35"/>
+    <path d="M90 460h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".28"/>
+    <path d="M1070 460h40l20 34-20 34h-40l-20-34z" fill="#e6a512" opacity=".28"/>
+    <rect x="90" y="70" width="1020" height="460" rx="28" fill="#fff8e7" stroke="#8a6a28" stroke-width="6"/>
+    <rect x="120" y="100" width="180" height="180" rx="90" fill="url(#honey)" stroke="#fff8e7" stroke-width="4"/>
+    <text x="210" y="210" text-anchor="middle" fill="#2f5d3a" font-family="Georgia, serif" font-size="72" font-weight="700">Б</text>
+    <text x="340" y="170" fill="#1c2e24" font-family="Georgia, serif" font-size="64" font-weight="700">${copy.title}</text>
+    <text x="340" y="230" fill="#2f5d3a" font-family="Trebuchet MS, sans-serif" font-size="30" font-weight="700">${copy.subtitle}</text>
+    <text x="340" y="290" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="22">Бортник — золотые соты · VK Mini App</text>
+    <rect x="120" y="360" width="960" height="120" rx="20" fill="#eef6e4" stroke="#a7c48a" stroke-width="3"/>
+    <circle cx="180" cy="420" r="28" fill="#f4e27a"/>
+    <circle cx="260" cy="420" r="28" fill="#8b5a2b"/>
+    <circle cx="340" cy="420" r="28" fill="#4caf6a"/>
+    <circle cx="420" cy="420" r="28" fill="#f0a500"/>
+    <circle cx="500" cy="420" r="28" fill="#d45d8c"/>
+    <text x="560" y="412" fill="#1c2e24" font-family="Trebuchet MS, sans-serif" font-size="24" font-weight="700">Нектар · мёд · осы · улучшения пасеки</text>
+    <text x="560" y="448" fill="#5a6d5f" font-family="Trebuchet MS, sans-serif" font-size="18">1200×600 · экран «${copy.title}»</text>
   </svg>`;
   await sharp(Buffer.from(svg))
     .jpeg({ quality: 92, mozjpeg: true })
-    .toFile(resolve(output, `screenshot-${name}-1280x720.jpg`));
+    .toFile(resolve(output, `screenshot-${name}-1200x600.jpg`));
 }
+
 
 await writeFile(
   resolve(root, "moderation", "texts.txt"),
