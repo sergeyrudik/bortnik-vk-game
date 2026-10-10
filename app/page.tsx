@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import bridge from "@vkontakte/vk-bridge";
+import { createVkBridge, readStoredValue, writeStoredValue } from "./vk-runtime";
 import Link from "next/link";
 import {
   NECTAR_DATA,
@@ -294,7 +295,7 @@ export default function HomePage() {
     const hydrate = async () => {
       let localSave: GameSave | null = null;
       try {
-        localSave = migrateSave(localStorage.getItem(SAVE_KEY));
+        localSave = migrateSave(readStoredValue(SAVE_KEY));
       } catch {
         // Storage may be blocked by browser privacy settings; continue with a fresh game.
       }
@@ -303,25 +304,23 @@ export default function HomePage() {
       try {
         await promiseWithTimeout(bridge.send("VKWebAppInit"), 1800);
         if (cancelled) return;
-        bridgeRef.current = bridge as unknown as VKBridge;
+        bridgeRef.current = createVkBridge(bridge as unknown as VKBridge);
         setVkReady(true);
 
         try {
-          await bridgeRef.current.send("VKWebAppSetViewSettings", {
+          void bridgeRef.current.send("VKWebAppSetViewSettings", {
             status_bar_style: "light",
             action_bar_color: "#2f5d3a",
             navigation_bar_color: "#2f5d3a",
-          });
+          }).catch(() => undefined);
         } catch {
           // optional
         }
 
         try {
-          const user = (await promiseWithTimeout(
-            bridgeRef.current.send("VKWebAppGetUserInfo"),
-            1800,
-          )) as VKUser;
-          setVkUser(user);
+          void bridgeRef.current.send("VKWebAppGetUserInfo").then((user) => {
+            if (!cancelled) setVkUser(user as VKUser);
+          }).catch(() => undefined);
         } catch {
           // optional
         }
@@ -362,7 +361,7 @@ export default function HomePage() {
     (save: GameSave) => {
       const value = serializeSave(save);
       try {
-        localStorage.setItem(SAVE_KEY, value);
+        writeStoredValue(SAVE_KEY, value);
       } catch {
         trackEvent("save_write_error", { source: "local" });
       }
