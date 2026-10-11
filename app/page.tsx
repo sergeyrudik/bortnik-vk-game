@@ -512,6 +512,7 @@ export default function HomePage() {
   const handleSwap = useCallback(
     async (from: { row: number; col: number }, to: { row: number; col: number }) => {
       if (busyRef.current || paused || adPolicyRef.current!.isBusy() || boundaryPendingRef.current || levelState.status !== "playing") return;
+      const requestEpoch = progressEpochRef.current;
       busyRef.current = true;
       setBusy(true);
       const { state, result } = applySwapToLevel(levelState, from, to);
@@ -548,6 +549,8 @@ export default function HomePage() {
       }
 
       await new Promise((resolve) => window.setTimeout(resolve, 180));
+      // Reset/hydration may replace progress while the match animation settles.
+      if (requestEpoch !== progressEpochRef.current) return;
       setLevelState(state);
       setFlash(new Set());
       setSelected(null);
@@ -759,12 +762,13 @@ export default function HomePage() {
   };
 
   const resetProgress = () => {
+    if (adPendingRef.current || boundaryPendingRef.current || adPolicyRef.current?.isBusy()) return;
     progressEpochRef.current += 1;
     questClaimedRef.current.clear();
     adPendingRef.current = false;
     upgradePendingRef.current = false;
     hintPendingRef.current = false;
-    const fresh = createDefaultSave();
+    const fresh = { ...createDefaultSave(), rewards: refreshRewards(rewards) };
     latestSaveRef.current = fresh;
     persistSave(fresh);
     applySave(fresh);

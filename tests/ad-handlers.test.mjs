@@ -174,3 +174,92 @@ test("pending next/retry boundary rejects reward handler even before policy acqu
     assert.equal(shows, 0); assert.equal(h.get("rewards").count, 0);
   } finally { clock.restore(); }
 });
+
+
+test("reset during winning swap animation cancels stale board and payout", async () => {
+  const clock = fakeEnvironment();
+  try {
+    const h = ready(undefined, { started: true });
+    const state = h.get("levelState");
+    h.set("levelState", { ...state, goals: [{ type: "honey", target: 1 }] });
+    let finishSwap;
+    window.setTimeout = (fn, ms) => { if (ms === 180) { finishSwap = fn; return 1; } fn(); return 1; };
+    const move = h.engine.findAvailableSwap(state.board);
+    const cell = p => h.render().find(node => node.type === "button" && node.props["aria-label"]?.includes(`ряд ${p.row + 1}, столбец ${p.col + 1}`));
+    cell(move.from).props.onClick(); cell(move.to).props.onClick(); await flush();
+    h.button("Итоги").props.onClick(); h.button("Сбросить прогресс").props.onClick(); h.button("Да, начать заново").props.onClick();
+    const fresh = structuredClone(h.get("levelState"));
+    finishSwap(); await flush();
+    assert.deepEqual(h.get("levelState"), fresh);
+    assert.equal(h.get("coins"), 120); assert.equal(h.get("stats").levelsWon, 0);
+    assert.equal(h.get("pendingReward"), null); assert.equal(h.get("busy"), false);
+  } finally { clock.restore(); }
+});
+
+// Actual component handlers with seeded unit save and mocked SDK transport;
+// this is not a native VK or live browser test.
+const resetQuotaSlug = 'bortnik';
+const currentQuota = h => ['bortnik', 'rodnik'].includes(resetQuotaSlug) ? h.get('rewards') : h.get('save').rewards;
+function putQuota(h, rewards) {
+  if (['bortnik', 'rodnik'].includes(resetQuotaSlug)) h.set('rewards', rewards);
+  else h.set('save', { ...h.get('save'), rewards });
+}
+function resetViaActualButtons(h) {
+  h.button('Итоги').props.onClick(); h.button('Сбросить').props.onClick();
+  if (resetQuotaSlug === 'bortnik') h.button('Да, начать заново').props.onClick();
+  if (resetQuotaSlug === 'rodnik') h.button('Сбросить', 1).props.onClick();
+}
+function rewardViaActualButton(h) {
+  h.button(resetQuotaSlug === 'bortnik' ? '+5 ходов за рекламу' :
+    resetQuotaSlug === 'rodnik' ? 'Отмены: +3 за рекламу' :
+    resetQuotaSlug === 'terem' ? 'Новые блоки за рекламу' : '📺 Убрать ряд').props.onClick();
+}
+function resumeResetGame(h) { if (h.get('started') === false) start(h); h.set('tab', resetQuotaSlug === 'bortnik' ? 'hive' : 'play'); }
+
+test('actual progress reset cannot reopen eight exhausted same-day rewarded views after cooldown', async () => {
+  const clock = fakeEnvironment();
+  try {
+    let shows = 0;
+    const h = ready({ send: async (method, params) => { if (method === 'VKWebAppShowNativeAds' && params?.ad_format === 'reward') shows++; return { result: true }; } }); start(h);
+    const original = { ...currentQuota(h), count: 8, lastRewardAt: clock.now() };
+    putQuota(h, original); h.ref('adPolicyRef').current.seedLastAdAt(clock.now());
+    resetViaActualButtons(h); resumeResetGame(h); clock.advance(180000);
+    rewardViaActualButton(h); await flush();
+    assert.equal(shows, 0, 'A ninth same-day view must be rejected before SDK even after a gameplay reset');
+    assert.deepEqual(currentQuota(h), original);
+    const serialized = h.engine.serializeSave({ ...h.engine.createDefaultSave(), rewards: currentQuota(h) });
+    assert.deepEqual(h.engine.migrateSave(serialized).rewards, original);
+  } finally { clock.restore(); }
+});
+
+test('actual reset rolls an expired reward day forward without losing successful-ad timestamp', () => {
+  const clock = fakeEnvironment(new Date(2026, 9, 11, 12).getTime());
+  try {
+    const h = ready(); start(h);
+    const old = { date: '2026-10-10', count: 8, lastRewardAt: clock.now() - 60000 };
+    putQuota(h, old); resetViaActualButtons(h);
+    assert.deepEqual(currentQuota(h), { date: '2026-10-11', count: 0, lastRewardAt: old.lastRewardAt });
+  } finally { clock.restore(); }
+});
+
+test('actual reset during deferred reward must preserve the round and count the successful video', async () => {
+  const clock = fakeEnvironment();
+  try {
+    let release, shows = 0;
+    const h = ready({ send: async (method, params) => {
+      if (method === 'VKWebAppShowNativeAds' && params?.ad_format === 'reward') {
+        shows++; return new Promise(resolve => { release = resolve; });
+      }
+      return { result: true };
+    } }); start(h);
+    const before = { ...currentQuota(h), count: 3, lastRewardAt: 0 }; putQuota(h, before);
+    rewardViaActualButton(h); await flush(); assert.equal(shows, 1);
+    const epoch = h.ref(resetQuotaSlug === 'bortnik' || resetQuotaSlug === 'rodnik' ? 'progressEpochRef' : 'roundEpochRef').current;
+    resetViaActualButtons(h);
+    assert.equal(h.ref(resetQuotaSlug === 'bortnik' || resetQuotaSlug === 'rodnik' ? 'progressEpochRef' : 'roundEpochRef').current, epoch, 'Pending reward prevents reset and stale-epoch cancellation');
+    assert.deepEqual(currentQuota(h), before);
+    release({ result: true }); await flush();
+    assert.equal(currentQuota(h).count, 4); assert.equal(currentQuota(h).lastRewardAt, clock.now());
+    assert.equal(h.ref('adPolicyRef').current.isBusy(), false);
+  } finally { clock.restore(); }
+});
