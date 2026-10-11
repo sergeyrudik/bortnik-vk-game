@@ -753,7 +753,7 @@ export default function HomePage() {
       return;
     }
 
-    if (!(await adPolicyRef.current!.beginReward())) return;
+    if (!(await adPolicyRef.current!.beginReward())) { setMessage("Реклама пока недоступна"); return; }
     adPendingRef.current = true;
     setAdPending(true);
     const requestEpoch = progressEpochRef.current;

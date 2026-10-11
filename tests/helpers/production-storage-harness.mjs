@@ -86,12 +86,32 @@ export function createHarness(repo, overrides = {}, bridge = { send: async () =>
 
 export const flush = () => new Promise(resolve => setImmediate(resolve));
 
+
+// Controlled same-origin Web Locks used by unit fixtures, never native VK proof.
+export function fakeWebLocks() {
+  const held = new Set(); const tails = new Map();
+  return { request(name, options, callback) {
+    const run = typeof options === "function" ? options : callback;
+    if (options?.ifAvailable) {
+      if (held.has(name)) return Promise.resolve(run(null));
+      held.add(name);
+      return Promise.resolve().then(() => run({ name })).finally(() => held.delete(name));
+    }
+    const queued = (tails.get(name) ?? Promise.resolve()).catch(() => undefined).then(async () => {
+      held.add(name); try { return await run({ name }); } finally { held.delete(name); }
+    });
+    tails.set(name, queued); return queued;
+  } };
+}
+
 export function fakeEnvironment(start = 1_800_000_000_000) {
   let time = start;
   const NativeDate = Date;
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   const originals = { Date: NativeDate, now: Date.now, window: globalThis.window, document: globalThis.document, storage: globalThis.localStorage, setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
   const listeners = new Map();
   const stored = new Map();
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { locks: fakeWebLocks() } });
   globalThis.Date = class extends NativeDate {
     constructor(...args) { super(...(args.length ? args : [time])); }
     static now() { return time; }
@@ -104,6 +124,6 @@ export function fakeEnvironment(start = 1_800_000_000_000) {
   return {
     emit(name) { listeners.get(name)?.forEach(fn => fn()); },
     stored, advance(ms) { time += ms; }, now: () => time,
-    restore() { globalThis.Date = originals.Date; Date.now = originals.now; globalThis.window = originals.window; globalThis.document = originals.document; globalThis.localStorage = originals.storage; globalThis.setTimeout = originals.setTimeout; globalThis.clearTimeout = originals.clearTimeout; },
+    restore() { if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator); else delete globalThis.navigator; globalThis.Date = originals.Date; Date.now = originals.now; globalThis.window = originals.window; globalThis.document = originals.document; globalThis.localStorage = originals.storage; globalThis.setTimeout = originals.setTimeout; globalThis.clearTimeout = originals.clearTimeout; },
   };
 }
