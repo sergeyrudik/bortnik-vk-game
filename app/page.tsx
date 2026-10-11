@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import bridge from "@vkontakte/vk-bridge";
 import { createVkBridge, readStoredValue, writeStoredValue } from "./vk-runtime";
+import { createAdPolicy } from "./ad-policy";
 import Link from "next/link";
 import {
   NECTAR_DATA,
@@ -47,9 +48,7 @@ const VK_SAVE_KEY = "bortnik_save";
 const REWARD_COINS = 60;
 const REWARD_MOVES = 5;
 const HINT_COST = 25;
-const REWARD_COOLDOWN_MS = 3 * 60 * 1000;
 const REWARD_DAILY_LIMIT = 8;
-const INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000;
 const VK_APP_URL =
   process.env.NEXT_PUBLIC_VK_APP_URL?.trim() || "https://vk.ru/app54694415";
 
@@ -174,12 +173,13 @@ export default function HomePage() {
   const [levelState, setLevelState] = useState<LevelState>(() => createLevelState(1));
   const [pendingReward, setPendingReward] = useState<{ coins: number; crystals: number } | null>(null);
   const [lastInterstitialAt, setLastInterstitialAt] = useState(0);
+  const [interstitialBusy, setInterstitialBusy] = useState(false);
 
   const bridgeRef = useRef<VKBridge | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const busyRef = useRef(false);
   const adPendingRef = useRef(false);
-  const interstitialPendingRef = useRef(false);
+  const boundaryPendingRef = useRef(false);
   const upgradePendingRef = useRef(false);
   const hintPendingRef = useRef(false);
   const questClaimedRef = useRef(new Set<string>());
@@ -188,6 +188,17 @@ export default function HomePage() {
   const latestSaveRef = useRef<GameSave | null>(null);
   const cloudSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const hintTimeoutRef = useRef<number | null>(null);
+  const adPolicyRef = useRef<ReturnType<typeof createAdPolicy> | null>(null);
+  if (adPolicyRef.current === null) {
+    adPolicyRef.current = createAdPolicy({
+      storageKey: "bortnik:ad-policy:v1",
+      onInterstitialBusyChange: setInterstitialBusy,
+    });
+  }
+
+  useEffect(() => {
+    if (hydrated && started) adPolicyRef.current?.startGameplay();
+  }, [hydrated, started]);
 
   const levelConfig = useMemo(() => getLevelConfig(level, upgrades), [level, upgrades]);
   const honeyTarget = honeyGoalTarget(levelState);
@@ -250,6 +261,8 @@ export default function HomePage() {
   }, []);
 
   const applySave = useCallback((save: GameSave) => {
+    adPolicyRef.current?.seedLastAdAt(save.rewards.lastRewardAt);
+    adPolicyRef.current?.seedLastAdAt(save.lastInterstitialAt);
     setCoins(save.coins);
     setCrystals(save.crystals);
     setLevel(save.level);
@@ -456,27 +469,16 @@ export default function HomePage() {
   }, [checkRewardAvailability, persistSave]);
 
   const maybeShowInterstitial = useCallback(async () => {
-    if (!bridgeRef.current || interstitialPendingRef.current || !tutorialDone) return;
-    const now = Date.now();
-    if (now - lastInterstitialAt < INTERSTITIAL_INTERVAL_MS) return;
-    interstitialPendingRef.current = true;
-    try {
-      const check = (await bridgeRef.current.send("VKWebAppCheckNativeAds", {
-        ad_format: "interstitial",
-      })) as { result?: boolean };
-      if (!check.result) return;
-      const shown = (await bridgeRef.current.send("VKWebAppShowNativeAds", {
-        ad_format: "interstitial",
-      })) as { result?: boolean };
-      if (shown.result !== true) return;
-      setLastInterstitialAt(now);
+    const client = bridgeRef.current;
+    const shown = await adPolicyRef.current!.maybeInterstitial(
+      (method, params) => client!.send(method, params),
+      Boolean(client && vkReady),
+    );
+    if (shown) {
+      setLastInterstitialAt(Date.now());
       trackEvent("interstitial_shown");
-    } catch {
-      // optional
-    } finally {
-      interstitialPendingRef.current = false;
     }
-  }, [lastInterstitialAt, trackEvent, tutorialDone]);
+  }, [trackEvent, vkReady]);
 
   const bumpDaily = useCallback((field: "match" | "level" | "wasp", amount = 1) => {
     setDaily((prev) => {
@@ -503,14 +505,13 @@ export default function HomePage() {
       setTutorialStep(2);
       playSound("win");
       trackEvent("level_win", { level: wonLevel });
-      void maybeShowInterstitial();
     },
-    [bumpDaily, maybeShowInterstitial, playSound, trackEvent],
+    [bumpDaily, playSound, trackEvent],
   );
 
   const handleSwap = useCallback(
     async (from: { row: number; col: number }, to: { row: number; col: number }) => {
-      if (busyRef.current || paused || levelState.status !== "playing") return;
+      if (busyRef.current || paused || adPolicyRef.current!.isBusy() || boundaryPendingRef.current || levelState.status !== "playing") return;
       busyRef.current = true;
       setBusy(true);
       const { state, result } = applySwapToLevel(levelState, from, to);
@@ -570,7 +571,7 @@ export default function HomePage() {
   );
 
   const onCellClick = (row: number, col: number) => {
-    if (busy || paused || levelState.status !== "playing") return;
+    if (busy || paused || adPolicyRef.current!.isBusy() || boundaryPendingRef.current || levelState.status !== "playing") return;
     setHinted(new Set());
     playSound("tap");
     if (!selected) {
@@ -591,7 +592,7 @@ export default function HomePage() {
   };
 
   const showHint = () => {
-    if (hintPendingRef.current || busyRef.current || paused || levelState.status !== "playing") return;
+    if (hintPendingRef.current || busyRef.current || paused || adPolicyRef.current!.isBusy() || levelState.status !== "playing") return;
     hintPendingRef.current = true;
     if (coins < HINT_COST) {
       setMessage("Не хватает монет на подсказку");
@@ -620,21 +621,41 @@ export default function HomePage() {
     trackEvent("hint_used", { level: levelState.level });
   };
 
-  const startNextLevel = () => {
-    const nextLevel = levelState.status === "won" ? levelState.level + 1 : level;
-    if (levelState.status === "won") setLevel(nextLevel);
-    setPendingReward(null);
-    winClaimedRef.current = false;
-    setLevelState(createLevelState(nextLevel, upgrades));
-    setSelected(null);
-    setTab("hive");
+  const startNextLevel = async () => {
+    if (boundaryPendingRef.current || adPolicyRef.current!.isBusy()) return;
+    boundaryPendingRef.current = true;
+    const requestEpoch = progressEpochRef.current;
+    try {
+      await maybeShowInterstitial();
+      if (requestEpoch !== progressEpochRef.current) return;
+      progressEpochRef.current += 1;
+      const nextLevel = levelState.status === "won" ? levelState.level + 1 : level;
+      if (levelState.status === "won") setLevel(nextLevel);
+      setPendingReward(null);
+      winClaimedRef.current = false;
+      setLevelState(createLevelState(nextLevel, upgrades));
+      setSelected(null);
+      setTab("hive");
+    } finally {
+      boundaryPendingRef.current = false;
+    }
   };
 
-  const retryLevel = () => {
-    setPendingReward(null);
-    winClaimedRef.current = false;
-    setLevelState(createLevelState(level, upgrades));
-    setSelected(null);
+  const retryLevel = async () => {
+    if (boundaryPendingRef.current || adPolicyRef.current!.isBusy()) return;
+    boundaryPendingRef.current = true;
+    const requestEpoch = progressEpochRef.current;
+    try {
+      await maybeShowInterstitial();
+      if (requestEpoch !== progressEpochRef.current) return;
+      progressEpochRef.current += 1;
+      setPendingReward(null);
+      winClaimedRef.current = false;
+      setLevelState(createLevelState(level, upgrades));
+      setSelected(null);
+    } finally {
+      boundaryPendingRef.current = false;
+    }
   };
 
   const buyUpgrade = (key: UpgradeKey) => {
@@ -674,14 +695,14 @@ export default function HomePage() {
   };
 
   const watchRewardAd = async (kind: "coins" | "moves") => {
-    if (adPendingRef.current) return;
+    if (busyRef.current || boundaryPendingRef.current || adPendingRef.current || adPolicyRef.current!.isBusy()) return;
+    if (kind === "moves" && levelState.status === "won") return;
     const fresh = refreshRewards(rewards);
-    const now = Date.now();
     if (fresh.count >= REWARD_DAILY_LIMIT) {
       setMessage("Дневной лимит наград исчерпан");
       return;
     }
-    if (now - fresh.lastRewardAt < REWARD_COOLDOWN_MS) {
+    if (adPolicyRef.current!.rewardWaitMs() > 0) {
       setMessage("Подождите немного перед следующей наградой");
       return;
     }
@@ -695,6 +716,7 @@ export default function HomePage() {
       return;
     }
 
+    if (!adPolicyRef.current!.beginReward()) return;
     adPendingRef.current = true;
     setAdPending(true);
     const requestEpoch = progressEpochRef.current;
@@ -702,6 +724,7 @@ export default function HomePage() {
       const response = (await bridgeRef.current.send("VKWebAppShowNativeAds", {
         ad_format: "reward",
       })) as { result?: boolean };
+      if (response.result === true) adPolicyRef.current!.finishReward(true);
       if (requestEpoch !== progressEpochRef.current) return;
       if (response.result !== true) {
         setMessage("Награда начисляется только после полного просмотра рекламы");
@@ -728,6 +751,7 @@ export default function HomePage() {
     } catch {
       setMessage("Не удалось показать рекламу");
     } finally {
+      adPolicyRef.current!.finishReward(false);
       adPendingRef.current = false;
       setAdPending(false);
       void checkRewardAvailability();
@@ -833,7 +857,7 @@ export default function HomePage() {
             <div className="start-hive" aria-hidden />
             <h1 className="start-brand">Бортник</h1>
             <p className="start-tagline">Золотые соты на опушке — наполни улей!</p>
-            <button type="button" className="start-play" onClick={() => setStarted(true)}>
+            <button type="button" className="start-play" onClick={() => { adPolicyRef.current!.startGameplay(); setStarted(true); }}>
               В улей
             </button>
             <div className="start-links">
@@ -989,7 +1013,7 @@ export default function HomePage() {
               <button
                 type="button"
                 className="btn secondary"
-                disabled={adPending || !vkReady || !adAvailable}
+                disabled={busy || adPending || interstitialBusy || !vkReady || !adAvailable}
                 onClick={() => void watchRewardAd("moves")}
               >
                 {rewardButtonLabel("moves")}
@@ -1033,7 +1057,7 @@ export default function HomePage() {
               <button
                 type="button"
                 className="btn secondary"
-                disabled={adPending || !vkReady || !adAvailable}
+                disabled={busy || adPending || interstitialBusy || !vkReady || !adAvailable}
                 onClick={() => void watchRewardAd("coins")}
               >
                 {rewardButtonLabel("coins")}
@@ -1166,11 +1190,11 @@ export default function HomePage() {
           <div className="overlay-card">
             <h3 id="win-title">Улей полон!</h3>
             <p>
-              Лужайка {levelState.level} собрана. +{pendingReward.coins} монет
+              Лужайка {levelState.level} собрана. Монеты: +{pendingReward.coins}
               {pendingReward.crystals ? `, +${pendingReward.crystals} 💎` : ""}.
             </p>
             <div className="btn-row">
-              <button type="button" className="btn" autoFocus onClick={startNextLevel}>
+              <button type="button" className="btn" autoFocus disabled={interstitialBusy || adPending} onClick={() => void startNextLevel()}>
                 Следующая лужайка
               </button>
             </div>
@@ -1182,15 +1206,22 @@ export default function HomePage() {
         <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="lost-title">
           <div className="overlay-card">
             <h3 id="lost-title">Ходы кончились</h3>
-            <p>Осы шумят, а банка ещё не полна. Попробуй снова или возьми ходы за рекламу.</p>
+            <p>
+              {levelState.goals.some((goal) => goal.type === "honey" && levelState.honey < goal.target)
+                ? "Банка мёда ещё не полна."
+                : levelState.goals.some((goal) => goal.type === "wax" && levelState.waxCleared < goal.target)
+                  ? "Мёд собран, но ещё остался воск."
+                  : "Не все цели по нектару выполнены."}{" "}
+              Попробуй снова или возьми ходы за рекламу.
+            </p>
             <div className="btn-row">
-              <button type="button" className="btn" autoFocus onClick={retryLevel}>
+              <button type="button" className="btn" autoFocus disabled={interstitialBusy || adPending} onClick={() => void retryLevel()}>
                 Ещё раз
               </button>
               <button
                 type="button"
                 className="btn secondary"
-                disabled={adPending || !vkReady || !adAvailable}
+                disabled={busy || adPending || interstitialBusy || !vkReady || !adAvailable}
                 onClick={() => void watchRewardAd("moves")}
               >
                 {rewardButtonLabel("moves")}

@@ -154,7 +154,7 @@ export const UPGRADE_DATA: Record<
     icon: "💨",
     title: "Дымарь",
     description: "Меньше ос на лужайках",
-    bonus: (level) => `−${Math.min(level, 4)} ос`,
+    bonus: (level) => `Осы: −${Math.min(level, 4)}`,
   },
 };
 
@@ -1305,7 +1305,7 @@ export function refreshDaily(daily: DailyProgress, date = getLocalDateKey()): Da
 
 export function refreshRewards(rewards: RewardLimits, date = getLocalDateKey()): RewardLimits {
   if (rewards.date === date) return rewards;
-  return createDefaultRewards(date);
+  return { ...createDefaultRewards(date), lastRewardAt: rewards.lastRewardAt };
 }
 
 export function isValidNectar(value: unknown): value is NectarKind {

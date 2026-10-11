@@ -226,7 +226,7 @@ test("daily and rewarded limits reset only after the local date changes", () => 
   assert.deepEqual(refreshRewards(rewards, "2026-07-27"), {
     date: "2026-07-27",
     count: 0,
-    lastRewardAt: 0,
+    lastRewardAt: 1234,
   });
 });
 
