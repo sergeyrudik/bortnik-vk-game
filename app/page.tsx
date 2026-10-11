@@ -341,12 +341,6 @@ export default function HomePage() {
     let cancelled = false;
 
     const hydrate = async () => {
-      let localSave: GameSave | null = null;
-      try {
-        localSave = migrateSave(readStoredValue(SAVE_KEY));
-      } catch {
-        // Storage may be blocked by browser privacy settings; continue with a fresh game.
-      }
       let cloudSave: GameSave | null = null;
 
       try {
@@ -390,8 +384,9 @@ export default function HomePage() {
       }
 
       if (cancelled) return;
-      localSave = migrateSave(readStoredValue(SAVE_KEY));
-      saveGuardRef.current!.initialize(readStoredValue(SAVE_KEY));
+      const localRaw = readStoredValue(SAVE_KEY);
+      const localSave = migrateSave(localRaw);
+      saveGuardRef.current!.initialize(localRaw);
       setSaveRenderRevision(saveGuardRef.current!.revision());
       const chosen = selectNewestSave(localSave, cloudSave);
       applySave(chosen ?? createDefaultSave());
