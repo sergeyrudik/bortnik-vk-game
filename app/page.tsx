@@ -1,4 +1,5 @@
 "use client";
+import { createSaveSnapshotGuard } from "./save-snapshot-guard";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import bridge from "@vkontakte/vk-bridge";
@@ -260,6 +261,15 @@ export default function HomePage() {
       .catch(() => undefined);
   }, []);
 
+  const saveGuardRef = useRef<ReturnType<typeof createSaveSnapshotGuard<GameSave>> | null>(null);
+  if (saveGuardRef.current === null) {
+    saveGuardRef.current = createSaveSnapshotGuard<GameSave>({
+      storageKey: SAVE_KEY, read: () => readStoredValue(SAVE_KEY),
+      write: (value) => writeStoredValue(SAVE_KEY, value), parse: migrateSave, serialize: serializeSave,
+    });
+  }
+  const [saveRenderRevision, setSaveRenderRevision] = useState(0);
+
   const applySave = useCallback((save: GameSave) => {
     adPolicyRef.current?.seedLastAdAt(save.rewards.lastRewardAt);
     adPolicyRef.current?.seedLastAdAt(save.lastInterstitialAt);
@@ -288,6 +298,31 @@ export default function HomePage() {
     setPendingReward(save.pendingReward);
     setLastInterstitialAt(save.lastInterstitialAt);
   }, []);
+
+  const adoptExternalSave = useCallback((external: GameSave) => {
+    setSaveRenderRevision(saveGuardRef.current!.revision());
+    progressEpochRef.current += 1;
+    latestSaveRef.current = external;
+    busyRef.current = false;
+    setBusy(false);
+    setSelected(null);
+    setFlash(new Set());
+    applySave(external);
+  }, [applySave]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const syncFromStorage = () => {
+      const external = saveGuardRef.current!.refresh();
+      if (external) adoptExternalSave(external);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === SAVE_KEY || event.key === null) syncFromStorage();
+    };
+    window.addEventListener("storage", onStorage);
+    syncFromStorage();
+    return () => window.removeEventListener("storage", onStorage);
+  }, [hydrated, adoptExternalSave]);
 
   const checkRewardAvailability = useCallback(async () => {
     if (!bridgeRef.current) return;
@@ -355,6 +390,9 @@ export default function HomePage() {
       }
 
       if (cancelled) return;
+      localSave = migrateSave(readStoredValue(SAVE_KEY));
+      saveGuardRef.current!.initialize(readStoredValue(SAVE_KEY));
+      setSaveRenderRevision(saveGuardRef.current!.revision());
       const chosen = selectNewestSave(localSave, cloudSave);
       applySave(chosen ?? createDefaultSave());
       setHydrated(true);
@@ -370,25 +408,20 @@ export default function HomePage() {
     };
   }, [applySave, checkRewardAvailability, trackEvent]);
 
-  const persistSave = useCallback(
-    (save: GameSave) => {
-      const value = serializeSave(save);
-      try {
-        writeStoredValue(SAVE_KEY, value);
-      } catch {
-        trackEvent("save_write_error", { source: "local" });
-      }
-
-      const activeBridge = bridgeRef.current;
-      if (activeBridge) {
-        cloudSaveQueueRef.current = cloudSaveQueueRef.current
-          .catch(() => undefined)
-          .then(() => activeBridge.send("VKWebAppStorageSet", { key: VK_SAVE_KEY, value }))
-          .catch(() => trackEvent("save_write_error", { source: "vk" }));
-      }
-    },
-    [trackEvent],
-  );
+  const persistSave = useCallback(async (save: GameSave, revision = saveGuardRef.current!.revision()) => {
+    const result = await saveGuardRef.current!.persist(save, revision);
+    if (result.external) adoptExternalSave(result.external);
+    if (!result.value) return;
+    const value = result.value;
+    const activeBridge = bridgeRef.current;
+    if (activeBridge) {
+      cloudSaveQueueRef.current = cloudSaveQueueRef.current
+        .catch(() => undefined)
+        .then(() => result.localWritten === false || saveGuardRef.current!.isCurrentValue(value)
+          ? activeBridge.send("VKWebAppStorageSet", { key: VK_SAVE_KEY, value }) : undefined)
+        .catch(() => trackEvent("save_write_error", { source: "vk" }));
+    }
+  }, [adoptExternalSave, trackEvent]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -410,7 +443,7 @@ export default function HomePage() {
       lastInterstitialAt,
     };
     latestSaveRef.current = save;
-    const timeout = window.setTimeout(() => persistSave(save), 250);
+    const timeout = window.setTimeout(() => void persistSave(save, saveRenderRevision), 250);
     return () => window.clearTimeout(timeout);
   }, [
     hydrated,
@@ -428,6 +461,7 @@ export default function HomePage() {
     pendingReward,
     lastInterstitialAt,
     persistSave,
+    saveRenderRevision,
   ]);
 
   useEffect(() => {
@@ -719,7 +753,7 @@ export default function HomePage() {
       return;
     }
 
-    if (!adPolicyRef.current!.beginReward()) return;
+    if (!(await adPolicyRef.current!.beginReward())) return;
     adPendingRef.current = true;
     setAdPending(true);
     const requestEpoch = progressEpochRef.current;
@@ -728,7 +762,9 @@ export default function HomePage() {
         ad_format: "reward",
       })) as { result?: boolean };
       if (response.result === true) adPolicyRef.current!.finishReward(true);
-      if (requestEpoch !== progressEpochRef.current) return;
+      const externalAtCompletion = saveGuardRef.current!.refresh();
+      const completedAgainst = externalAtCompletion ?? saveGuardRef.current!.latest();
+      if ((externalAtCompletion || requestEpoch !== progressEpochRef.current) && completedAgainst) adoptExternalSave(completedAgainst);
       if (response.result !== true) {
         setMessage("Награда начисляется только после полного просмотра рекламы");
         return;
@@ -736,14 +772,14 @@ export default function HomePage() {
 
       const rewardedAt = Date.now();
       const rewardedDate = getLocalDateKey(new Date(rewardedAt));
-      const currentLimits = refreshRewards(fresh, rewardedDate);
+      const currentLimits = refreshRewards(completedAgainst?.rewards ?? fresh, rewardedDate);
       setRewards({
         date: currentLimits.date,
         count: currentLimits.count + 1,
         lastRewardAt: rewardedAt,
       });
       setStats((prev) => ({ ...prev, adsWatched: prev.adsWatched + 1 }));
-      if (kind === "coins") {
+      if (kind === "coins" || completedAgainst?.levelState?.status === "won") {
         setCoins((value) => value + REWARD_COINS);
         setMessage(`+${REWARD_COINS} монет`);
       } else {
@@ -763,12 +799,14 @@ export default function HomePage() {
 
   const resetProgress = () => {
     if (adPendingRef.current || boundaryPendingRef.current || adPolicyRef.current?.isBusy()) return;
+    saveGuardRef.current!.initialize(readStoredValue(SAVE_KEY), true);
+      setSaveRenderRevision(saveGuardRef.current!.revision());
     progressEpochRef.current += 1;
     questClaimedRef.current.clear();
     adPendingRef.current = false;
     upgradePendingRef.current = false;
     hintPendingRef.current = false;
-    const fresh = { ...createDefaultSave(), rewards: refreshRewards(rewards) };
+    const fresh = { ...createDefaultSave(), rewards: refreshRewards(saveGuardRef.current!.latest()?.rewards ?? rewards) };
     latestSaveRef.current = fresh;
     persistSave(fresh);
     applySave(fresh);
